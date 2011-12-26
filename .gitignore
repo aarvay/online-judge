@@ -1,0 +1,24 @@
+# Temporary files
+tmp/**/*
+tmp/*
+.sass-cache/*
+.DS_Store
+.idea
+.redcar
+.rvmrc
+.stgit*
+*.swap
+*.swo
+*.swp
+*~
+bin/*
+
+# Config Files
+config/database.yml
+
+# Generated Files
+log/*
+
+# Jekyll
+_drafts/
+_site/
