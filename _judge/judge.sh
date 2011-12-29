@@ -15,11 +15,12 @@
 #  details.
 
 #  Developed primarily for use in SASTRA's internal online judge. 
-#  But will work like charm for any production environment.
 
 #  For usage, see README.
 
-VERBOSE=0
+TEMP=0
+declare -a temp_files
+trap cleanup EXIT
 
 if [ $# -lt 1 ]; then
   echo "Missing Arguments"
@@ -28,7 +29,7 @@ fi
 
 # Parsing arguments with getopts 
 # It doesn't handle contiguous args like -cps
-while getopts ":c:p:s:l:t:m:v" opt; do
+while getopts ":c:p:s:l:t:m:" opt; do
   case $opt in
     c) CONTEST_ID=$OPTARG ;;
     p) PROBLEM_ID=$OPTARG ;;
@@ -36,7 +37,6 @@ while getopts ":c:p:s:l:t:m:v" opt; do
     l) LANGUAGE=$OPTARG ;;
     t) TIME_LIMIT=$OPTARG ;;
     m) MEM_LIMIT=$OPTARG ;;
-    v) VERBOSE=1 ;;
     \?) echo "Invalid option -$OPTARG" ;;
     :) echo "-$OPTARG requires an argument" ;;
   esac
@@ -48,25 +48,52 @@ if [ -z "${CONTEST_ID+xxx}" ] || [ -z "${LANGUAGE+xxx}" ]; then
   exit 1
 fi
 
+#Traps exit and cleans up the executables.
+function cleanup {
+  case $? in
+    0) echo "AC" ;;
+    1) echo "CE" ;;
+    2) echo "RE" ;;
+    3) echo "TLE" ;;
+    4) echo "WA" ;;
+  esac
+  for ((i=0;i<${TEMP};i++)); do
+    rm ${temp_files[${i}]}
+  done
+  rm cerrors
+}
+
 function compile {
   case $LANGUAGE in
     gcc) compileCommand="gcc -O2 $1 -lm -o $2" ;;
     g++) compileCommand="g++ -O2 $1 -lm -o $2" ;;
-    *) echo "Kuch bhi." ;;
+    *) echo "Invalid language or not supported." 
+      exit 1 ;;
   esac
+  $compileCommand 2> cerrors
+  if [ $? -ne 0 ]; then
+    exit 1
+  else
+    temp_files[$TEMP]=$2
+    ((TEMP++))
+  fi
 }
 
-function run {
-  echo "e"
+function runTests {
+  for inp in $( ls $2/input ); do
+    ./$1 < "$2/input/$inp"  > "$2/output/$inp.out"
+  done
 }
 
 function setupProblem {
   pgmLoc="$1/$2/reference"
-  pgm=$( ls $pgmLoc )
-  op=${pgm%.*}
-  pgm="$pgmLoc/$pgm"
-  op="$pgmLoc/$op"
-  compile $pgm $op
+  for pgm in $( ls $pgmLoc ); do
+    op=${pgm%.*}
+    pgm="$pgmLoc/$pgm"
+    op="$pgmLoc/$op"
+    compile $pgm $op
+    runTests $op "$1/$2"
+  done
 }
 
 function setupContest {
