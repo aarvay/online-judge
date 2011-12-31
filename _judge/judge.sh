@@ -79,9 +79,21 @@ function compile {
   fi
 }
 
-function runTests {
+function runTests { #Params : Executable, Problem, [name]
   for inp in $( ls $2/input ); do
-    ./$1 < "$2/input/$inp"  > "$2/output/$inp.out"
+    if [ -z "${3+xxx}" ]; then
+      ./$1 < "$2/input/$inp"  > "$2/output/${inp%.*}.out"
+    else
+      ./$1 < "$2/input/$inp"  > "$2/output/$3-${inp%.*}.out"
+      if [ $? -eq 0 ]; then
+        temp_files[$TEMP]="$2/output/$3-${inp%.*}.out"
+        ((TEMP++))
+      fi
+      oup=$( diff "$2/output/${inp%.*}.out" "$2/output/$3-${inp%.*}.out" );
+      if [ oup != '\n' ]; then
+        exit 4
+      fi
+    fi
   done
 }
 
@@ -100,7 +112,7 @@ function setupContest {
   contest=$1
   if [ ! -d "$contest/" ]; then
     echo "Contest ID: $contest does not exist"
-    exit 1
+    exit 9
   fi
   
   for problem in $( ls $contest ); do
@@ -109,14 +121,20 @@ function setupContest {
 }
 
 function judgeSubmission {
-  echo "ju"
+  sub="$1/$2/submissions/$3"
+  case $LANGUAGE in
+    g++) ext="cpp" ;;
+    gcc) ext="c" ;;
+  esac
+  compile "$sub.$ext" $sub
+  runTests $sub "$1/$2" $3
 }
 
 if [ -z "${PROBLEM_ID+xxx}" ]; then
   setupContest $CONTEST_ID
   exit 0
 elif [ ! -z "${SUBMISSION_ID+xxx}" ]; then
-  judgeSubmission
+  judgeSubmission $CONTEST_ID $PROBLEM_ID $SUBMISSION_ID
   exit 0
 else
   setupProblem $CONTEST_ID $PROBLEM_ID
