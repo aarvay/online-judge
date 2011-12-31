@@ -22,32 +22,6 @@ TEMP=0
 declare -a temp_files
 trap cleanup EXIT
 
-if [ $# -lt 1 ]; then
-  echo "Missing Arguments"
-  exit 1
-fi
-
-# Parsing arguments with getopts 
-# It doesn't handle contiguous args like -cps
-while getopts ":c:p:s:l:t:m:" opt; do
-  case $opt in
-    c) CONTEST_ID=$OPTARG ;;
-    p) PROBLEM_ID=$OPTARG ;;
-    s) SUBMISSION_ID=$OPTARG ;;
-    l) LANGUAGE=$OPTARG ;;
-    t) TIME_LIMIT=$OPTARG ;;
-    m) MEM_LIMIT=$OPTARG ;;
-    \?) echo "Invalid option -$OPTARG" ;;
-    :) echo "-$OPTARG requires an argument" ;;
-  esac
-done
-shift $(($OPTIND-1))
-
-if [ -z "${CONTEST_ID+xxx}" ] || [ -z "${LANGUAGE+xxx}" ]; then
-  echo "Contest ID or Language is missing."
-  exit 1
-fi
-
 #Traps exit and cleans up the executables.
 function cleanup {
   case $? in
@@ -60,18 +34,54 @@ function cleanup {
   for ((i=0;i<${TEMP};i++)); do
     rm ${temp_files[${i}]}
   done
-  rm cerrors
+  if [ -e cerrors ]; then 
+    rm cerrors
+  fi
 }
 
-function compile {
+if [ $# -lt 1 ]; then
+  echo "Missing Arguments" 1>&2
+  exit 9
+fi
+
+# Parsing arguments with getopts 
+# It doesn't handle contiguous args like -cps
+while getopts ":c:p:s:l:t:m:" opt; do
+  case $opt in
+    c) CONTEST_ID=$OPTARG ;;
+    p) PROBLEM_ID=$OPTARG ;;
+    s) SUBMISSION_ID=$OPTARG ;;
+    l) LANGUAGE=$OPTARG ;;
+    t) TIME_LIMIT=$OPTARG ;;
+    m) MEM_LIMIT=$OPTARG ;;
+    \?)
+      echo "Invalid option -$OPTARG" 1>&2
+      exit 9 
+      ;;
+    :)
+      echo "-$OPTARG requires an argument" 1>&2
+      exit 9
+      ;;
+  esac
+done
+shift $(($OPTIND-1))
+
+if [ -z "${CONTEST_ID+xxx}" ] || [ -z "${LANGUAGE+xxx}" ]; then
+  echo "Contest ID or Language is missing." 1>&2
+  exit 9
+fi
+
+# Compiles a program. Isn't that implicit?
+function compile { #Params : Program, Executable
   case $LANGUAGE in
     gcc) compileCommand="gcc -O2 $1 -lm -o $2" ;;
     g++) compileCommand="g++ -O2 $1 -lm -o $2" ;;
-    *) echo "Invalid language or not supported." 
-      exit 1 ;;
+    *)
+      echo "Invalid language or not supported." 1>&2 
+      exit 9 ;;
   esac
   $compileCommand 2> cerrors
-  if [ $? -ne 0 ]; then
+  if [ $? -ne 0 ]; then #It's a compile error
     exit 1
   else
     temp_files[$TEMP]=$2
@@ -79,6 +89,8 @@ function compile {
   fi
 }
 
+# Does 2 things: 
+# 1) Run the reference program or 2) Run and diff the submission
 function runTests { #Params : Executable, Problem, [name]
   for inp in $( ls $2/input ); do
     if [ -z "${3+xxx}" ]; then
@@ -97,7 +109,8 @@ function runTests { #Params : Executable, Problem, [name]
   done
 }
 
-function setupProblem {
+# Set's up a particular problem in the contest
+function setupProblem { #Params : ContestID, ProblemID
   pgmLoc="$1/$2/reference"
   for pgm in $( ls $pgmLoc ); do
     op=${pgm%.*}
@@ -108,10 +121,11 @@ function setupProblem {
   done
 }
 
-function setupContest {
+# Set's up an entire contest
+function setupContest { #Params : ContestID
   contest=$1
   if [ ! -d "$contest/" ]; then
-    echo "Contest ID: $contest does not exist"
+    echo "Contest ID: $contest does not exist" 1>&2
     exit 9
   fi
   
@@ -120,7 +134,9 @@ function setupContest {
   done
 }
 
-function judgeSubmission {
+
+# Again, implicit
+function judgeSubmission { #Params : ContestID, ProblemID, SubmissionID
   sub="$1/$2/submissions/$3"
   case $LANGUAGE in
     g++) ext="cpp" ;;
