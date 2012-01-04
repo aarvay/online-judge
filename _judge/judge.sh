@@ -96,13 +96,17 @@ function runTests { #Params : Executable, Problem, [name]
     if [ -z "${3+xxx}" ]; then
       ./$1 < "$2/input/$inp"  > "$2/output/${inp%.*}.out"
     else
-      ./$1 < "$2/input/$inp"  > "$2/output/$3-${inp%.*}.out"
+      timeout $TIME_LIMIT ./$1 < "$2/input/$inp"  > "$2/output/$3-${inp%.*}.out"
       if [ $? -eq 0 ]; then
         temp_files[$TEMP]="$2/output/$3-${inp%.*}.out"
         ((TEMP++))
+      elif [ $? -eq 124 ]; then
+        exit 3 #TLE 
+      else
+        exit 2 #Runtime error
       fi
-      oup=$( diff "$2/output/${inp%.*}.out" "$2/output/$3-${inp%.*}.out" );
-      if [ oup != '\n' ]; then
+      oup=$( diff --ignore-all-space --ignore-blank-lines "$2/output/${inp%.*}.out" "$2/output/$3-${inp%.*}.out" | tr -d '\n' );
+      if [ -n "$oup" ]; then
         exit 4
       fi
     fi
