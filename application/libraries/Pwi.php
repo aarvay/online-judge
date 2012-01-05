@@ -10,6 +10,8 @@
  * @link	    http://aarvay.in/pwi
  */
 
+require_once('phpQuery.php');
+
 class Pwi {
     protected $regno; //Register Number of the Student.
     protected $pass; //Password => Birthday(ddmmyyyy)
